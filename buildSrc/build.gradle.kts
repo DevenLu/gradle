@@ -28,6 +28,10 @@ java {
 
 gradlePlugin {
     plugins.invoke {
+        "classycle" {
+            id = "classycle"
+            implementationClass = "org.gradle.plugins.classycle.ClassyclePlugin"
+        }
         "jsoup" {
             id = "jsoup"
             implementationClass = "org.gradle.plugins.jsoup.JsoupPlugin"
@@ -76,7 +80,6 @@ val isCiServer: Boolean by extra { System.getenv().containsKey("CI") }
 
 apply { from("../gradle/compile.gradle") }
 apply { from("../gradle/dependencies.gradle") }
-apply { from("../gradle/classycle.gradle") }
 
 
 if (!isCiServer || (isCiServer && System.getProperty("enableCodeQuality")?.toLowerCase() == "true")) {
