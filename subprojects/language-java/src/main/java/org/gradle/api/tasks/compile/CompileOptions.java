@@ -51,7 +51,7 @@ public class CompileOptions extends AbstractOptions {
     private static final long serialVersionUID = 0;
 
     private static final ImmutableSet<String> EXCLUDE_FROM_ANT_PROPERTIES =
-            ImmutableSet.of("debugOptions", "forkOptions", "compilerArgs", "incremental");
+            ImmutableSet.of("debugOptions", "forkOptions", "compilerArgs", "incremental", "allCompilerArgs", "compilerArgumentProviders");
 
     private boolean failOnError = true;
 
@@ -337,6 +337,12 @@ public class CompileOptions extends AbstractOptions {
         return compilerArgs;
     }
 
+    /**
+     * Returns all compiler arguments, added to the {@link #getCompilerArgs()} property or via {@link #addCompilerArgumentProvider(CompilerArgumentProvider)}.
+     *
+     * @since 4.5
+     */
+    @Incubating
     @Internal
     public List<String> getAllCompilerArgs() {
         ImmutableList.Builder<String> builder = ImmutableList.builder();
@@ -362,7 +368,10 @@ public class CompileOptions extends AbstractOptions {
 
     /**
      * Add a compiler argument provider.
+     *
+     * @since 4.5
      */
+    @Incubating
     public void addCompilerArgumentProvider(CompilerArgumentProvider argumentProvider) {
         compilerArgumentProviders.add(argumentProvider);
     }

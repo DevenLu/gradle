@@ -38,6 +38,7 @@ import java.io.File;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.ArrayDeque;
 import java.util.Map;
 import java.util.Queue;
@@ -62,13 +63,31 @@ public class PropertyValidationAccess {
             new ClasspathPropertyAnnotationHandler(), new CompileClasspathPropertyAnnotationHandler()
         ));
         Queue<ClassNode> queue = new ArrayDeque<ClassNode>();
-        queue.add(new ClassNode(null, beanClass));
+        queue.add(new ClassNode(null, beanClass, beanClass));
         boolean cacheable = taskClassInfoStore.getTaskClassInfo(Cast.<Class<? extends Task>>uncheckedCast(beanClass)).isCacheable();
 
         while (!queue.isEmpty()) {
             ClassNode node = queue.remove();
-            validateTaskClass(beanClass, cacheable, problems, queue, node, metadataStore.getTypeMetadata(node.getBeanClass()));
+            Set<PropertyMetadata> typeMetadata = metadataStore.getTypeMetadata(node.getBeanClass());
+            if (Iterable.class.isAssignableFrom(node.getBeanClass()) && shouldBeTraversed(typeMetadata)) {
+                @SuppressWarnings("unchecked")
+                TypeToken<Iterable> typeToken = (TypeToken<Iterable>) TypeToken.of(node.getBeanType());
+                ParameterizedType type = (ParameterizedType) typeToken.getSupertype(Iterable.class).getType();
+                TypeToken<?> nestedType = TypeToken.of(type.getActualTypeArguments()[0]);
+                queue.add(new ClassNode(node.parentPropertyName + "$1", nestedType.getRawType(), nestedType.getType()));
+            } else {
+                validateTaskClass(beanClass, cacheable, problems, queue, node, typeMetadata);
+            }
         }
+    }
+
+    private static boolean shouldBeTraversed(Set<PropertyMetadata> typeMetadata) {
+        for (PropertyMetadata metadata : typeMetadata) {
+            if (metadata.getPropertyType() != null) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static void validateTaskClass(Class<?> beanClass, boolean cacheable, Map<String, Boolean> problems, Queue<ClassNode> queue, ClassNode node, Set<PropertyMetadata> typeMetadata) {
@@ -92,13 +111,7 @@ public class PropertyValidationAccess {
             }
             if (metadata.isAnnotationPresent(Nested.class)) {
                 Class<?> declaredType = metadata.getDeclaredType();
-                if (Iterable.class.isAssignableFrom(declaredType)) {
-                    TypeToken<Iterable> typeToken = (TypeToken<Iterable>) TypeToken.of(metadata.getMethod().getGenericReturnType());
-                    ParameterizedType type = (ParameterizedType) typeToken.getSupertype(Iterable.class).getType();
-                    queue.add(new ClassNode(qualifiedPropertyName, TypeToken.of(type.getActualTypeArguments()[0]).getRawType()));
-                } else {
-                    queue.add(new ClassNode(qualifiedPropertyName, declaredType));
-                }
+                queue.add(new ClassNode(qualifiedPropertyName, declaredType, metadata.getMethod().getGenericReturnType()));
             }
         }
     }
@@ -110,14 +123,20 @@ public class PropertyValidationAccess {
     private static class ClassNode {
         private final String parentPropertyName;
         private final Class<?> propertyClass;
+        private final Type beanType;
 
-        public ClassNode(@Nullable String parentPropertyName, Class<?> beanClass) {
+        public ClassNode(@Nullable String parentPropertyName, Class<?> beanClass, Type beanType) {
             this.parentPropertyName = parentPropertyName;
             this.propertyClass = beanClass;
+            this.beanType = beanType;
         }
 
         public Class<?> getBeanClass() {
             return propertyClass;
+        }
+
+        public Type getBeanType() {
+            return beanType;
         }
 
         public String getQualifiedPropertyName(String propertyName) {

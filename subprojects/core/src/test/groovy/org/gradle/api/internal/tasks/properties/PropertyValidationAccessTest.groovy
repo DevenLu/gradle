@@ -23,6 +23,7 @@ import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.Nested
 import org.gradle.api.tasks.OutputFile
 import spock.lang.Specification
@@ -107,9 +108,36 @@ class PropertyValidationAccessTest extends Specification {
 
         then:
         problems.keySet() == validationProblems(TaskWithIterableNested, [
-                "property 'beans.nonAnnotated' is not annotated with an input or output annotation",
-                "property 'beanList.nonAnnotated' is not annotated with an input or output annotation"
+                "property 'beans\$1.nonAnnotated' is not annotated with an input or output annotation",
+                "property 'beanList\$1.nonAnnotated' is not annotated with an input or output annotation"
         ])
+    }
+
+    static class AnnotatedIterable extends ArrayList<NestedBean> {
+        @Input
+        String someProperty = "annotated"
+
+        @Override
+        @Internal
+        boolean isEmpty() {
+            return super.isEmpty()
+        }
+    }
+
+    static class TaskWithNestedAnnotatedIterable extends DefaultTask {
+        @Nested
+        AnnotatedIterable annotatedIterable
+    }
+
+    def "does not look at the type parameter of annotated iterable subclasses"() {
+        def propertyValidationAccess = new PropertyValidationAccess()
+        def problems = new HashMap<String, Boolean>()
+        when:
+        propertyValidationAccess.collectTaskValidationProblems(TaskWithNestedAnnotatedIterable, problems)
+
+        then:
+        problems.keySet().empty
+
     }
 
     static class TaskWithNonAnnotatedProperty extends DefaultTask {
